@@ -31,6 +31,13 @@ namespace NetSeep
         public bool AutoHideFullscreen = true;
         public int? X = null;
         public int? Y = null;
+
+        // ---- 桌面宠物 ----
+        public bool Pet = true;
+        public int PetSize = 100;      // 百分比
+        public int? PetX = null;
+        public int? PetY = null;
+
         public string UpColor = "90,214,140";
         public string DownColor = "86,170,245";
         public string BgColor = "24,24,27";
@@ -122,6 +129,10 @@ namespace NetSeep
                 case "autohidefullscreen": AutoHideFullscreen = ParseBool(v, AutoHideFullscreen); break;
                 case "x": X = ParseInt(v, 0); break;
                 case "y": Y = ParseInt(v, 0); break;
+                case "pet": Pet = ParseBool(v, Pet); break;
+                case "petsize": PetSize = ParseInt(v, PetSize); break;
+                case "petx": PetX = ParseInt(v, 0); break;
+                case "pety": PetY = ParseInt(v, 0); break;
                 case "upcolor": UpColor = v; break;
                 case "downcolor": DownColor = v; break;
                 case "bgcolor": BgColor = v; break;
@@ -134,6 +145,7 @@ namespace NetSeep
             IntervalMs = Clamp(IntervalMs, 250, 10000);
             OpacityPercent = Clamp(OpacityPercent, 20, 100);
             BgAlpha = Clamp(BgAlpha, 0, 255);
+            PetSize = Clamp(PetSize, 50, 300);
             if (string.IsNullOrEmpty(Theme)) Theme = Themes.DefaultId;
         }
 
@@ -158,6 +170,10 @@ namespace NetSeep
                 sb.AppendLine("autohidefullscreen=" + (AutoHideFullscreen ? "1" : "0"));
                 if (X.HasValue) sb.AppendLine("x=" + X.Value.ToString(CultureInfo.InvariantCulture));
                 if (Y.HasValue) sb.AppendLine("y=" + Y.Value.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine("pet=" + (Pet ? "1" : "0"));
+                sb.AppendLine("petsize=" + PetSize.ToString(CultureInfo.InvariantCulture));
+                if (PetX.HasValue) sb.AppendLine("petx=" + PetX.Value.ToString(CultureInfo.InvariantCulture));
+                if (PetY.HasValue) sb.AppendLine("pety=" + PetY.Value.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("upcolor=" + UpColor);
                 sb.AppendLine("downcolor=" + DownColor);
                 sb.AppendLine("bgcolor=" + BgColor);

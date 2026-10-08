@@ -1,4 +1,4 @@
-﻿// NetSeep - 入口 / 命令行工具（--dump 实测速率，--preview 生成预览图）
+// NetSeep - 入口 / 命令行工具（--dump 实测速率，--preview 生成预览图）
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -82,7 +82,7 @@ namespace NetSeep
 
     internal static class Program
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.2.0";
         private const string MutexName = @"Local\NetSeep.SingleInstance.v1";
 
         [STAThread]
@@ -105,6 +105,8 @@ namespace NetSeep
                     return PreviewMode(args);
                 case "--themes":
                     return ThemesMode(args);
+                case "--pet":
+                    return PetMode(args);
                 case "--reset":
                     Cli.Open();
                     AppConfig.Delete();
@@ -231,6 +233,7 @@ namespace NetSeep
             Cli.WriteLine("  NetSeep.exe --list         列出所有网卡");
             Cli.WriteLine("  NetSeep.exe --preview 路径 [缩放] [主题]   生成界面预览图");
             Cli.WriteLine("  NetSeep.exe --themes 目录 [缩放]          每个内置主题各出一张预览图");
+            Cli.WriteLine("  NetSeep.exe --pet 路径 [缩放]             宠物 6 种状态的对照图");
             Cli.WriteLine("  NetSeep.exe --reset        删除配置文件");
             Cli.WriteLine("  NetSeep.exe --help         显示本帮助");
             Cli.WriteLine();
@@ -393,6 +396,109 @@ namespace NetSeep
             Cli.Open();
             Cli.WriteLine(string.Format(CultureInfo.InvariantCulture,
                 "已生成 {0} 张主题预览图：{1}", count, Path.GetFullPath(dir)));
+            Cli.Close(false);
+            return 0;
+        }
+
+        /// <summary>把宠物的 6 种状态画成一排，用于 README 插图 / 直观检查每个状态的样子。</summary>
+        private static int PetMode(string[] args)
+        {
+            string path = args.Length > 1 ? args[1] : "netseep-pet.png";
+            float scale = 3f;   // 宠物本体很小，默认放大 3 倍才好观察
+            if (args.Length > 2)
+                float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out scale);
+            if (scale < 1f) scale = 1f;
+
+            PetMood[] moods = new PetMood[]
+            {
+                PetMood.Sleep, PetMood.Idle, PetMood.Walk, PetMood.Run, PetMood.Sprint, PetMood.Happy
+            };
+            string[] labels = new string[]
+            {
+                "睡觉 · 无流量", "发呆 · 低速", "踱步 · 中速", "小跑 · 高速", "冲刺 · 极速", "被摸 · 开心"
+            };
+
+            Size cell = PetRenderer.Measure(scale);
+            const int pad = 16, gap = 10, labelH = 26;
+            int cw = cell.Width + gap;
+            int cwTotal = pad * 2 + moods.Length * cell.Width + (moods.Length - 1) * gap;
+            int chTotal = pad * 2 + cell.Height + labelH;
+
+            using (Bitmap canvas = new Bitmap(cwTotal, chTotal, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(canvas))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    // 棋盘格底，方便看清透明区域
+                    const int cs = 8;
+                    for (int y = 0; y < chTotal; y += cs)
+                    {
+                        for (int x = 0; x < cwTotal; x += cs)
+                        {
+                            bool odd = ((x / cs) + (y / cs)) % 2 == 1;
+                            using (SolidBrush b = new SolidBrush(odd
+                                ? Color.FromArgb(255, 205, 205, 205)
+                                : Color.FromArgb(255, 240, 240, 240)))
+                                g.FillRectangle(b, x, y, cs, cs);
+                        }
+                    }
+
+                    using (Font font = new Font("Microsoft YaHei UI", 9f, FontStyle.Regular, GraphicsUnit.Point))
+                    using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(255, 60, 62, 68)))
+                    using (StringFormat sf = new StringFormat())
+                    {
+                        sf.Alignment = StringAlignment.Center;
+                        for (int i = 0; i < moods.Length; i++)
+                        {
+                            PetFrame f = new PetFrame();
+                            f.Mood = moods[i];
+                            f.Scale = scale;
+                            f.Phase = 0.35 + i * 0.21;   // 固定相位，出图稳定
+                            f.Facing = 1;
+                            f.EyeX = 0.4;
+                            f.EyeY = 0.15;
+                            f.Accent = Color.FromArgb(90, 214, 140);
+                            if (moods[i] == PetMood.Happy)
+                            {
+                                HeartParticle[] hs = new HeartParticle[3];
+                                for (int k = 0; k < 3; k++)
+                                {
+                                    hs[k] = new HeartParticle();
+                                    hs[k].X = 27f + k * 5f;
+                                    hs[k].Y = 14f - k * 3.5f;
+                                    hs[k].Size = 7f;
+                                    hs[k].Life = 0.75f;
+                                    hs[k].Drift = 0f;
+                                }
+                                f.Hearts = hs;
+                            }
+
+                            using (Bitmap cellBmp = new Bitmap(cell.Width, cell.Height, PixelFormat.Format32bppArgb))
+                            {
+                                using (Graphics cg = Graphics.FromImage(cellBmp))
+                                {
+                                    cg.Clear(Color.Transparent);
+                                    PetRenderer.Draw(cg, f);
+                                }
+                                int x = pad + i * cw;
+                                canvas.SetResolution(g.DpiX, g.DpiY);
+                                g.DrawImageUnscaled(cellBmp, x, pad);
+                                g.DrawString(labels[i], font, textBrush,
+                                    new RectangleF(x - gap / 2f, pad + cell.Height + 2, cell.Width + gap, labelH), sf);
+                            }
+                        }
+                    }
+                }
+
+                string dir = Path.GetDirectoryName(Path.GetFullPath(path));
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                canvas.Save(path, ImageFormat.Png);
+            }
+
+            Cli.Open();
+            Cli.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                "已生成宠物状态图：{0}", Path.GetFullPath(path)));
             Cli.Close(false);
             return 0;
         }

@@ -26,6 +26,8 @@ namespace NetSeep
         private NotifyIcon _tray;
         private ContextMenuStrip _menu;
         private Icon _icon;
+        private PetForm _pet;
+        private WidgetTheme _theme = Themes.Find(Themes.DefaultId);
 
         private List<NicEntry> _nics = new List<NicEntry>();
         private float _scale = 1f;
@@ -102,11 +104,12 @@ namespace NetSeep
             _watchTimer.Start();
 
             CreateTray();
+            if (_cfg.Pet) CreatePet();
 
             if (_cfg.FirstRun && !_silent)
             {
                 ShowBalloon("NetSeep 已启动",
-                    "拖动可移动位置，右键（或托盘图标）可设置网卡、透明度、开机自启等。\nCtrl+Alt+N 可随时开关鼠标穿透。",
+                    "拖动可移动位置，右键（或托盘图标）可设置网卡、主题、透明度、宠物等。\nCtrl+Alt+N 可随时开关鼠标穿透。",
                     ToolTipIcon.Info);
             }
         }
@@ -115,6 +118,13 @@ namespace NetSeep
         {
             if (_sampleTimer != null) _sampleTimer.Stop();
             if (_watchTimer != null) _watchTimer.Stop();
+
+            if (_pet != null)
+            {
+                _pet.Close();
+                _pet.Dispose();
+                _pet = null;
+            }
 
             if (_hotkeyOn)
             {
@@ -188,6 +198,7 @@ namespace NetSeep
             Push(_downHist, _downBps);
 
             Render();
+            if (_pet != null) _pet.SetSpeed(_upBps, _downBps);
             UpdateTrayText();
         }
 
@@ -221,12 +232,16 @@ namespace NetSeep
             v.Opacity = _cfg.OpacityPercent / 100f;
 
             // 主题：预设 / 跟随系统 / 自定义（沿用配置文件里的颜色）
-            v.ApplyTheme(Themes.Resolve(
+            _theme = Themes.Resolve(
                 _cfg.Theme,
                 AppConfig.ParseColor(_cfg.BgColor, Color.FromArgb(24, 24, 27)),
                 _cfg.BgAlpha,
                 AppConfig.ParseColor(_cfg.UpColor, Color.FromArgb(90, 214, 140)),
-                AppConfig.ParseColor(_cfg.DownColor, Color.FromArgb(86, 170, 245))));
+                AppConfig.ParseColor(_cfg.DownColor, Color.FromArgb(86, 170, 245)));
+            v.ApplyTheme(_theme);
+
+            // 宠物的天线光球跟着主题走
+            if (_pet != null) _pet.Accent = _theme.Up;
 
             v.UpHistory = _upHist.ToArray();
             v.DownHistory = _downHist.ToArray();
@@ -302,6 +317,7 @@ namespace NetSeep
             Native.SetWindowPos(Handle,
                 _cfg.TopMost ? Native.HWND_TOPMOST : Native.HWND_NOTOPMOST,
                 0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+            if (_pet != null) _pet.ApplyTopMost();
         }
 
         private void ApplyClickThrough()
@@ -392,6 +408,10 @@ namespace NetSeep
         {
             bool want = !_userHidden && !fullscreenCovers;
             _hiddenByFullscreen = !want && !_userHidden;
+
+            // 全屏游戏/视频时连宠物一起让位；用户手动隐藏浮窗时宠物留在原地
+            if (_pet != null) _pet.SetAutoHidden(fullscreenCovers);
+
             if (want == Visible) return;
 
             Visible = want;
@@ -561,6 +581,51 @@ namespace NetSeep
             }
         }
 
+        // ==================================================================
+        //  桌面宠物
+        // ==================================================================
+        private void CreatePet()
+        {
+            if (_pet != null) return;
+            _pet = new PetForm(_cfg);
+            _pet.Accent = _theme.Up;
+            _pet.ContextMenuRequested = delegate (Point p) { ShowSharedMenu(p); };
+            _pet.SetSpeed(_upBps, _downBps);
+            _pet.Show();
+            _pet.ApplyTopMost();
+        }
+
+        private void DestroyPet()
+        {
+            if (_pet == null) return;
+            _pet.Close();
+            _pet.Dispose();
+            _pet = null;
+        }
+
+        private void SetPetVisible(bool on)
+        {
+            _cfg.Pet = on;
+            _cfg.Save();
+            if (on) CreatePet();
+            else DestroyPet();
+        }
+
+        private void SetPetSize(int percent)
+        {
+            _cfg.PetSize = percent;
+            _cfg.Save();
+            if (_pet != null) _pet.RefreshScaleAndSize();
+        }
+
+        /// <summary>宠物右键时也弹同一份菜单。</summary>
+        private void ShowSharedMenu(Point screenPos)
+        {
+            if (_menu == null) return;
+            BuildMenu();
+            _menu.Show(screenPos);
+        }
+
         private ToolStripMenuItem Item(string text, bool check, EventHandler onClick)
         {
             ToolStripMenuItem it = new ToolStripMenuItem(text);
@@ -651,6 +716,41 @@ namespace NetSeep
                 theme.DropDownItems.Add(it);
             }
             _menu.Items.Add(theme);
+
+            // ---- 桌面宠物 ----
+            ToolStripMenuItem petMenu = new ToolStripMenuItem("桌面宠物");
+            petMenu.DropDown.Renderer = new DarkMenuRenderer();
+            petMenu.DropDownItems.Add(Item("显示桌面宠物", _cfg.Pet, delegate
+            {
+                SetPetVisible(!_cfg.Pet);
+            }));
+            petMenu.DropDownItems.Add(new ToolStripSeparator());
+            int[] petSizes = new int[] { 75, 100, 125, 150, 200 };
+            foreach (int ps in petSizes)
+            {
+                int captured = ps;
+                petMenu.DropDownItems.Add(Item("大小 " + captured + " %", _cfg.PetSize == captured, delegate
+                {
+                    SetPetSize(captured);
+                }));
+            }
+            petMenu.DropDownItems.Add(new ToolStripSeparator());
+            petMenu.DropDownItems.Add(Item("摸摸它", false, delegate
+            {
+                if (_pet == null) SetPetVisible(true);
+                if (_pet != null) _pet.Pet();
+            }));
+            petMenu.DropDownItems.Add(Item("让它回到原位", false, delegate
+            {
+                if (_pet != null) _pet.MoveHome();
+            }));
+            petMenu.DropDownItems.Add(new ToolStripSeparator());
+            ToolStripMenuItem petInfo = new ToolStripMenuItem(_pet == null
+                ? "它现在在睡觉（未显示）"
+                : "已经摸过它 " + _pet.PetCount + " 次");
+            petInfo.Enabled = false;
+            petMenu.DropDownItems.Add(petInfo);
+            _menu.Items.Add(petMenu);
 
             // ---- 刷新间隔 ----
             ToolStripMenuItem iv = new ToolStripMenuItem("刷新间隔");
@@ -763,108 +863,14 @@ namespace NetSeep
                 "滚轮 = 调整不透明度，右键 = 菜单" + Environment.NewLine +
                 "Ctrl+Alt+N = 开关鼠标穿透" + Environment.NewLine +
                 "托盘图标双击 = 拉回浮窗" + Environment.NewLine +
+                (_pet != null
+                    ? "宠物：点一下摸摸它（已摸 " + _pet.PetCount + " 次），拖动可以搬家" + Environment.NewLine
+                    : "宠物：右键菜单 → 桌面宠物 里可以叫出来" + Environment.NewLine) +
                 Environment.NewLine +
                 "配置文件：" + AppConfig.FilePath;
 
             MessageBox.Show(this, text, "关于 NetSeep", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        // ==================================================================
-        //  逐像素 alpha 分层绘制表面
-        // ==================================================================
-        private sealed class LayeredSurface : IDisposable
-        {
-            private IntPtr _hBitmap = IntPtr.Zero;
-            private IntPtr _bits = IntPtr.Zero;
-            private Bitmap _bitmap;
-            private Graphics _graphics;
-            private Size _size = Size.Empty;
-
-            public void EnsureSize(Size size)
-            {
-                if (size.Width <= 0 || size.Height <= 0) return;
-                if (size == _size && _bitmap != null) return;
-                Release();
-                _size = size;
-
-                IntPtr screenDc = Native.GetDC(IntPtr.Zero);
-                try
-                {
-                    Native.BITMAPINFO bmi = new Native.BITMAPINFO();
-                    bmi.bmiHeader.biSize = Marshal.SizeOf(typeof(Native.BITMAPINFOHEADER));
-                    bmi.bmiHeader.biWidth = size.Width;
-                    bmi.bmiHeader.biHeight = -size.Height; // 自上而下
-                    bmi.bmiHeader.biPlanes = 1;
-                    bmi.bmiHeader.biBitCount = 32;
-                    bmi.bmiHeader.biCompression = Native.BI_RGB;
-
-                    _hBitmap = Native.CreateDIBSection(screenDc, ref bmi, Native.DIB_RGB_COLORS,
-                        out _bits, IntPtr.Zero, 0);
-                    if (_hBitmap == IntPtr.Zero || _bits == IntPtr.Zero)
-                    {
-                        Release();
-                        return;
-                    }
-
-                    // 直接包裹 DIB 内存绘制：GDI+ 会按预乘 alpha 写入，正好符合 UpdateLayeredWindow 的要求
-                    _bitmap = new Bitmap(size.Width, size.Height, size.Width * 4,
-                        PixelFormat.Format32bppPArgb, _bits);
-                    _graphics = Graphics.FromImage(_bitmap);
-                }
-                finally
-                {
-                    Native.ReleaseDC(IntPtr.Zero, screenDc);
-                }
-            }
-
-            public void Draw(Action<Graphics> draw)
-            {
-                if (_graphics == null) return;
-                draw(_graphics);
-                _graphics.Flush(FlushIntention.Sync);
-            }
-
-            public void Flush(IntPtr hwnd, int x, int y)
-            {
-                if (_hBitmap == IntPtr.Zero) return;
-
-                IntPtr screenDc = Native.GetDC(IntPtr.Zero);
-                IntPtr memDc = Native.CreateCompatibleDC(screenDc);
-                IntPtr old = IntPtr.Zero;
-                try
-                {
-                    old = Native.SelectObject(memDc, _hBitmap);
-                    Native.POINT src = new Native.POINT(0, 0);
-                    Native.POINT dst = new Native.POINT(x, y);
-                    Native.SIZE size = new Native.SIZE(_size.Width, _size.Height);
-                    Native.BLENDFUNCTION bf = new Native.BLENDFUNCTION();
-                    bf.BlendOp = Native.AC_SRC_OVER;
-                    bf.BlendFlags = 0;
-                    bf.SourceConstantAlpha = 255;
-                    bf.AlphaFormat = Native.AC_SRC_ALPHA;
-                    Native.UpdateLayeredWindow(hwnd, screenDc, ref dst, ref size, memDc, ref src, 0, ref bf, Native.ULW_ALPHA);
-                }
-                finally
-                {
-                    if (old != IntPtr.Zero) Native.SelectObject(memDc, old);
-                    Native.DeleteDC(memDc);
-                    Native.ReleaseDC(IntPtr.Zero, screenDc);
-                }
-            }
-
-            private void Release()
-            {
-                if (_graphics != null) { _graphics.Dispose(); _graphics = null; }
-                if (_bitmap != null) { _bitmap.Dispose(); _bitmap = null; }
-                if (_hBitmap != IntPtr.Zero) { Native.DeleteObject(_hBitmap); _hBitmap = IntPtr.Zero; }
-                _bits = IntPtr.Zero;
-                _size = Size.Empty;
-            }
-
-            public void Dispose()
-            {
-                Release();
-            }
-        }
     }
 }

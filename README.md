@@ -3,14 +3,15 @@
 [![build](https://github.com/wuge2019/NetSeep/actions/workflows/build.yml/badge.svg)](https://github.com/wuge2019/NetSeep/actions/workflows/build.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.5%2B-512BD4.svg)](#构建)
-[![size](https://img.shields.io/badge/exe-87%20KB-brightgreen.svg)](#构建)
+[![size](https://img.shields.io/badge/exe-104%20KB-brightgreen.svg)](#构建)
 
 一个参考火绒「流量悬浮窗」的 Windows 桌面小工具：一个小巧的半透明浮窗，实时显示当前**上传 / 下载速度**。
 
 - **纯 C# 实现**，只依赖 Windows 自带的 .NET Framework 4.5+，**零第三方组件**
-- **单个 exe，约 87 KB**，双击即用，无需安装、不写系统目录
+- **单个 exe，约 104 KB**，双击即用，无需安装、不写系统目录
 - 分层窗口（`UpdateLayeredWindow`）逐像素 alpha 自绘：圆角、半透明、抗锯齿，与火绒浮窗观感一致
 - 逐显示器 DPI 感知（PerMonitorV2），高分屏下依然锐利
+- **桌面宠物**：一只跟着网速变状态的小家伙，睡觉 / 发呆 / 踱步 / 小跑 / 冲刺 / 被摸，全部矢量手绘
 - 作者：**Lyu** ｜ 许可：[MIT](LICENSE)
 
 ![浮窗效果](assets/preview-dark.png)
@@ -35,6 +36,8 @@ dist\NetSeep.exe            # 运行后浮窗出现在屏幕右上角，托盘�
 | 滚轮 | 调整不透明度 |
 | `Ctrl + Alt + N` | 开关「鼠标穿透」（浮窗不再拦截点击） |
 | 托盘图标双击 | 把浮窗拉回默认位置并恢复交互 |
+| **点一下宠物** | 摸摸它（冒爱心、脸红、开心 2 秒），菜单里能看到被摸次数 |
+| **拖动宠物** | 给它搬家（位置自动记住） |
 
 > 鼠标穿透开启后浮窗收不到鼠标消息，**用 `Ctrl+Alt+N` 或托盘菜单恢复**。
 
@@ -42,6 +45,7 @@ dist\NetSeep.exe            # 运行后浮窗出现在屏幕右上角，托盘�
 
 - **实时速率**：`↑ 上传` / `↓ 下载`，单位自动在 `B/s → KB/s → MB/s → GB/s` 间切换，数字右对齐，宽度不跳动
 - **主题切换**：7 套内置主题（深色 / 浅色 / 午夜蓝 / 石墨灰 / 高对比 / 极简透明）+ **跟随系统**（随 Windows 浅色深色模式自动变色）+ 自定义配色，右键菜单一键切换
+- **桌面宠物**：状态跟着网速走，可以摸、可以拖、可以调大小、可以关掉；全屏时自动让位
 - **合计或指定网卡**：默认统计所有真实网卡；也可在菜单里只盯某一块网卡（自动排除回环、隧道与 NDIS 过滤层，不会把同一份流量重复计算）
 - **迷你曲线图**：最近 60 秒的上下行走势
 - **刷新间隔**：0.5 / 1 / 2 / 5 秒
@@ -61,6 +65,27 @@ dist\NetSeep.exe            # 运行后浮窗出现在屏幕右上角，托盘�
 
 主题只影响配色，和「不透明度」是两个独立维度：例如「极简透明」+ 60% 不透明度可以把浮窗压到几乎只剩数字。
 
+## 桌面宠物
+
+一只自己画出来的小家伙，**状态完全跟着当前网速走**：
+
+![宠物状态](assets/pet.png)
+
+| 状态 | 触发条件 | 表现 |
+| --- | --- | --- |
+| 睡觉 | 完全没有流量 | 身体变灰、闭眼、头顶冒 `z` |
+| 发呆 | < 16 KB/s | 睁眼、瞳孔跟着鼠标转、随机眨眼、在自己窝附近溜达 |
+| 踱步 | 16 ~ 160 KB/s | 迈开小碎步、尾巴摆动加快 |
+| 小跑 | 160 KB/s ~ 1.5 MB/s | 张嘴笑、身后拖出速度线、天线变成琥珀色 |
+| 冲刺 | > 1.5 MB/s | 星星眼、脸红、天线通红发光、速度线更密 |
+| 被摸 | 点它一下 | `^ ^` 眯眼笑 + 脸红 + 冒爱心，开心 2 秒后回到按网速判断的状态 |
+
+- **天线上的光球就是速度指示灯**：暗灰（睡着）→ 主题色（正常）→ 琥珀（小跑）→ 通红并脉动（冲刺）
+- 右键宠物 = 弹出和浮窗一样的菜单，里有「桌面宠物」子菜单：显示/隐藏、大小 75%~200%、摸摸它、让它回到原位
+- 宠物和浮窗是**两个独立窗口**：可以分别拖动、分别记忆位置；浮窗设了「置顶」宠物也跟着置顶
+- **全屏游戏/电影时宠物会自动隐藏**（和浮窗一样判断），退出全屏自动回来
+- 它只在自己窝附近 ±34 像素溜达，不会满屏乱跑；拖到哪儿，哪儿就是新窝
+
 ## 命令行
 
 ```
@@ -70,6 +95,7 @@ NetSeep.exe --dump [秒]         控制台实测网速，并打印网卡列表�
 NetSeep.exe --list              列出所有网卡
 NetSeep.exe --preview 路径 [缩放] [主题]  渲染界面预览图（透明/深色/浅色/棋盘格四张）
 NetSeep.exe --themes 目录 [缩放]          每个内置主题各出一张预览图（用于做主题画廊）
+NetSeep.exe --pet 路径 [缩放]             把宠物 6 种状态画成一排（用于做 README 插图）
 NetSeep.exe --reset             删除配置文件
 NetSeep.exe --help              帮助
 ```
@@ -121,6 +147,10 @@ topmost=1  locked=0       # 置顶 / 锁定位置
 clickthrough=0            # 鼠标穿透
 autohidefullscreen=1      # 全屏时自动隐藏
 x=1756  y=690             # 浮窗位置
+# 桌面宠物
+pet=1                     # 是否显示宠物
+petsize=100               # 宠物大小百分比（50~300）
+petx=1808  pety=968       # 宠物位置（拖到哪儿存哪儿）
 # 以下四项仅在 theme=custom 时生效
 bgalpha=190               # 底板透明度
 upcolor=90,214,140        # 上行颜色 R,G,B
@@ -223,9 +253,11 @@ powershell -ExecutionPolicy Bypass -File tools\check-false-positive.ps1
 
 ```
 src\
-  Program.cs       入口、命令行工具（--dump / --preview / --themes / --list）、控制台输出封装
-  WidgetForm.cs    浮窗窗体、交互、托盘、右键菜单、分层绘制表面
+  Program.cs       入口、命令行工具（--dump / --preview / --themes / --pet / --list）、控制台输出封装
+  WidgetForm.cs    浮窗窗体、交互、托盘、右键菜单、宠物的生成与联动
   Render.cs        自绘渲染（圆角底板、箭头、数值、迷你曲线）、深色菜单渲染器、图标绘制
+  Pet.cs           桌面宠物：状态机 + 全部矢量绘制
+  Surface.cs       逐像素 alpha 的分层绘制表面（浮窗与宠物共用）
   Theme.cs         主题预设与解析（含“跟随系统”深浅色检测）
   Traffic.cs       网卡枚举、行布局探测、差分测速、速率格式化
   Config.cs        配置持久化、开机自启（精简构建下会被编译掉）、颜色解析
