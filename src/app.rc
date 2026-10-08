@@ -1,0 +1,48 @@
+/* NetSeep 资源脚本：图标 + 清单 + 版本信息
+   —— 由 build.ps1 用 Windows SDK 的 rc.exe 编译成 .res 后交给 csc 的 /win32res。
+   带完整版本信息的 exe 会显著降低杀软启发式误报的概率。
+   这里不 include 任何头文件，相关宏自行定义，避免依赖 SDK 头文件是否安装。 */
+
+#pragma code_page(65001)
+
+#define VFT_APP              0x00000001L
+#define VFT2_UNKNOWN         0x00000000L
+#define VOS_NT_WINDOWS32     0x00040004L
+#define VS_FFI_FILEFLAGSMASK 0x0000003FL
+
+/* 程序图标（ID 最小的图标会被资源管理器当作 exe 图标） */
+1 ICON "netseep.ico"
+
+/* 应用程序清单：DPI 感知 / 兼容性 / 以当前用户权限运行 */
+1 24 "app.manifest"
+
+/* 版本信息（资源管理器“属性 - 详细信息”里显示的内容） */
+1 VERSIONINFO
+ FILEVERSION     1,0,0,0
+ PRODUCTVERSION  1,0,0,0
+ FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+ FILEFLAGS       0x0L
+ FILEOS          VOS_NT_WINDOWS32
+ FILETYPE        VFT_APP
+ FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "080404B0"
+    BEGIN
+      VALUE "CompanyName",      "NetSeep Project"
+      VALUE "FileDescription",  "NetSeep 网速悬浮窗"
+      VALUE "FileVersion",      "1.0.0.0"
+      VALUE "InternalName",     "NetSeep"
+      VALUE "LegalCopyright",   "Copyright (C) 2026 NetSeep Project"
+      VALUE "OriginalFilename", "NetSeep.exe"
+      VALUE "ProductName",      "NetSeep"
+      VALUE "ProductVersion",   "1.0.0.0"
+      VALUE "Comments",         "实时显示上传/下载速率的桌面悬浮窗，纯 C# 实现，无第三方依赖。"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x804, 1200
+  END
+END

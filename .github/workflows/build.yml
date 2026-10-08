@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: 编译 NetSeep.exe
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 显示环境
+        shell: pwsh
+        run: |
+          Write-Host "csc: $((Get-Command "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" -ErrorAction SilentlyContinue).Source)"
+
+      - name: 构建（含版本信息与图标）
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: 构建精简版
+        shell: pwsh
+        run: ./build.ps1 -Minimal
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetSeep
+          path: |
+            dist/NetSeep.exe
+            dist/NetSeep.exe.sha256
+            dist/NetSeep-minimal.exe
+            dist/NetSeep-minimal.exe.sha256
+          if-no-files-found: error
