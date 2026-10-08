@@ -26,9 +26,23 @@ namespace NetSeep
         public float Opacity = 0.88f;
 
         public Color BgColor = Color.FromArgb(24, 24, 27);
+        public int BgAlpha = 190;
         public Color BorderColor = Color.FromArgb(255, 255, 255);
+        public int BorderAlpha = 46;
         public Color UpColor = Color.FromArgb(90, 214, 140);
         public Color DownColor = Color.FromArgb(86, 170, 245);
+
+        /// <summary>套用一套主题（颜色 + 底板/边框透明度）。</summary>
+        public void ApplyTheme(WidgetTheme t)
+        {
+            if (t == null) return;
+            BgColor = t.Bg;
+            BgAlpha = t.BgAlpha;
+            BorderColor = t.Border;
+            BorderAlpha = t.BorderAlpha;
+            UpColor = t.Up;
+            DownColor = t.Down;
+        }
     }
 
     /// <summary>一次布局计算出的全部像素尺寸。</summary>
@@ -110,8 +124,8 @@ namespace NetSeep
 
             float s = m.Scale;
             float alpha = v.Opacity;
-            int bgAlpha = ScaleAlpha(190, alpha);
-            int borderA = ScaleAlpha(46, alpha);
+            int bgAlpha = ScaleAlpha(v.BgAlpha, alpha);
+            int borderA = ScaleAlpha(v.BorderAlpha, alpha);
 
             RectangleF full = new RectangleF(0.5f * s, 0.5f * s, m.Size.Width - 1f * s, m.Size.Height - 1f * s);
 

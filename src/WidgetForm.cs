@@ -161,6 +161,11 @@ namespace NetSeep
                 m.Result = IntPtr.Zero;
                 return;
             }
+            if (m.Msg == Native.WM_SETTINGCHANGE || m.Msg == Native.WM_DWMCOLORIZATIONCOLORCHANGED)
+            {
+                // 系统浅色/深色模式变化时，若当前是“跟随系统”主题就立刻换色
+                if (Themes.IsSystem(_cfg.Theme)) Render();
+            }
             base.WndProc(ref m);
         }
 
@@ -214,9 +219,15 @@ namespace NetSeep
             v.ShowDown = _cfg.ShowDown;
             v.ShowGraph = _cfg.ShowGraph;
             v.Opacity = _cfg.OpacityPercent / 100f;
-            v.BgColor = AppConfig.ParseColor(_cfg.BgColor, Color.FromArgb(24, 24, 27));
-            v.UpColor = AppConfig.ParseColor(_cfg.UpColor, Color.FromArgb(90, 214, 140));
-            v.DownColor = AppConfig.ParseColor(_cfg.DownColor, Color.FromArgb(86, 170, 245));
+
+            // 主题：预设 / 跟随系统 / 自定义（沿用配置文件里的颜色）
+            v.ApplyTheme(Themes.Resolve(
+                _cfg.Theme,
+                AppConfig.ParseColor(_cfg.BgColor, Color.FromArgb(24, 24, 27)),
+                _cfg.BgAlpha,
+                AppConfig.ParseColor(_cfg.UpColor, Color.FromArgb(90, 214, 140)),
+                AppConfig.ParseColor(_cfg.DownColor, Color.FromArgb(86, 170, 245))));
+
             v.UpHistory = _upHist.ToArray();
             v.DownHistory = _downHist.ToArray();
             return v;
@@ -619,6 +630,27 @@ namespace NetSeep
                 Render();
             }));
             _menu.Items.Add(show);
+
+            // ---- 主题 ----
+            ToolStripMenuItem theme = new ToolStripMenuItem("主题");
+            theme.DropDown.Renderer = new DarkMenuRenderer();
+            foreach (WidgetTheme t in Themes.Presets)
+            {
+                WidgetTheme captured = t;
+                ToolStripMenuItem it = Item(captured.Name,
+                    string.Equals(_cfg.Theme, captured.Id, StringComparison.OrdinalIgnoreCase), delegate
+                {
+                    _cfg.Theme = captured.Id;
+                    _cfg.Save();
+                    Render();
+                });
+                if (captured.IsSystem)
+                    it.ToolTipText = "跟随 Windows 的浅色/深色应用模式，系统切换时自动变色";
+                if (captured.IsCustom)
+                    it.ToolTipText = "使用配置文件里的 bgcolor / bgalpha / upcolor / downcolor";
+                theme.DropDownItems.Add(it);
+            }
+            _menu.Items.Add(theme);
 
             // ---- 刷新间隔 ----
             ToolStripMenuItem iv = new ToolStripMenuItem("刷新间隔");

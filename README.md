@@ -3,12 +3,12 @@
 [![build](https://github.com/wuge2019/NetSeep/actions/workflows/build.yml/badge.svg)](https://github.com/wuge2019/NetSeep/actions/workflows/build.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.5%2B-512BD4.svg)](#构建)
-[![size](https://img.shields.io/badge/exe-83%20KB-brightgreen.svg)](#构建)
+[![size](https://img.shields.io/badge/exe-87%20KB-brightgreen.svg)](#构建)
 
 一个参考火绒「流量悬浮窗」的 Windows 桌面小工具：一个小巧的半透明浮窗，实时显示当前**上传 / 下载速度**。
 
 - **纯 C# 实现**，只依赖 Windows 自带的 .NET Framework 4.5+，**零第三方组件**
-- **单个 exe，约 83 KB**，双击即用，无需安装、不写系统目录
+- **单个 exe，约 87 KB**，双击即用，无需安装、不写系统目录
 - 分层窗口（`UpdateLayeredWindow`）逐像素 alpha 自绘：圆角、半透明、抗锯齿，与火绒浮窗观感一致
 - 逐显示器 DPI 感知（PerMonitorV2），高分屏下依然锐利
 - 作者：**Lyu** ｜ 许可：[MIT](LICENSE)
@@ -41,16 +41,25 @@ dist\NetSeep.exe            # 运行后浮窗出现在屏幕右上角，托盘�
 ## 功能
 
 - **实时速率**：`↑ 上传` / `↓ 下载`，单位自动在 `B/s → KB/s → MB/s → GB/s` 间切换，数字右对齐，宽度不跳动
+- **主题切换**：7 套内置主题（深色 / 浅色 / 午夜蓝 / 石墨灰 / 高对比 / 极简透明）+ **跟随系统**（随 Windows 浅色深色模式自动变色）+ 自定义配色，右键菜单一键切换
 - **合计或指定网卡**：默认统计所有真实网卡；也可在菜单里只盯某一块网卡（自动排除回环、隧道与 NDIS 过滤层，不会把同一份流量重复计算）
 - **迷你曲线图**：最近 60 秒的上下行走势
 - **刷新间隔**：0.5 / 1 / 2 / 5 秒
-- **不透明度**：100% ~ 50%，滚轮快捷调整
+- **不透明度**：100% ~ 50%，滚轮快捷调整（与主题叠加生效）
 - **置顶显示 / 锁定位置 / 鼠标穿透 / 全屏时自动隐藏**（全屏游戏、视频时自动让位）
 - **开机自动启动**：写入 `HKCU\...\CurrentVersion\Run`，不需要管理员权限
 - **托盘常驻**：即使浮窗被隐藏或穿透，也能从托盘菜单找回
 - **便携模式**：exe 同目录放一个 `portable.txt`，配置改存到 `NetSeepData\` 子目录，不碰 `%APPDATA%`
 - **单实例**：重复启动不会出现第二个托盘图标
 - 崩溃时把异常写到 `%APPDATA%\NetSeep\error.log`，不会静默消失
+
+## 主题
+
+右键菜单 → **主题** 即可切换；选择「跟随系统」时，Windows 在浅色 / 深色之间切换会立刻反映到浮窗上。
+
+![主题一览](assets/themes.png)
+
+主题只影响配色，和「不透明度」是两个独立维度：例如「极简透明」+ 60% 不透明度可以把浮窗压到几乎只剩数字。
 
 ## 命令行
 
@@ -59,10 +68,14 @@ NetSeep.exe                     启动悬浮窗
 NetSeep.exe --silent            启动但不弹首次运行提示（供开机自启使用）
 NetSeep.exe --dump [秒]         控制台实测网速，并打印网卡列表与采样行布局
 NetSeep.exe --list              列出所有网卡
-NetSeep.exe --preview 路径 [缩放]  渲染界面预览图（默认生成透明/深色/浅色三张）
+NetSeep.exe --preview 路径 [缩放] [主题]  渲染界面预览图（透明/深色/浅色/棋盘格四张）
+NetSeep.exe --themes 目录 [缩放]          每个内置主题各出一张预览图（用于做主题画廊）
 NetSeep.exe --reset             删除配置文件
 NetSeep.exe --help              帮助
 ```
+
+主题 id：`dark` / `light` / `midnight` / `graphite` / `contrast` / `glass` / `system` / `custom`，
+例如 `NetSeep.exe --preview out.png 2 light`。
 
 `--dump` 很适合排错，例如：
 
@@ -102,11 +115,14 @@ nic=                      # 网卡 GUID，空 = 全部网卡合计
 showup=1  showdown=1      # 显示上传 / 下载
 showgraph=0               # 迷你曲线图
 intervalms=1000           # 刷新间隔
+theme=dark                # 主题：dark/light/midnight/graphite/contrast/glass/system/custom
 opacity=88                # 不透明度 %
 topmost=1  locked=0       # 置顶 / 锁定位置
 clickthrough=0            # 鼠标穿透
 autohidefullscreen=1      # 全屏时自动隐藏
 x=1756  y=690             # 浮窗位置
+# 以下四项仅在 theme=custom 时生效
+bgalpha=190               # 底板透明度
 upcolor=90,214,140        # 上行颜色 R,G,B
 downcolor=86,170,245      # 下行颜色
 bgcolor=24,24,27          # 底板颜色
@@ -207,18 +223,20 @@ powershell -ExecutionPolicy Bypass -File tools\check-false-positive.ps1
 
 ```
 src\
-  Program.cs       入口、命令行工具（--dump / --preview / --list）、控制台输出封装
+  Program.cs       入口、命令行工具（--dump / --preview / --themes / --list）、控制台输出封装
   WidgetForm.cs    浮窗窗体、交互、托盘、右键菜单、分层绘制表面
   Render.cs        自绘渲染（圆角底板、箭头、数值、迷你曲线）、深色菜单渲染器、图标绘制
+  Theme.cs         主题预设与解析（含“跟随系统”深浅色检测）
   Traffic.cs       网卡枚举、行布局探测、差分测速、速率格式化
   Config.cs        配置持久化、开机自启（精简构建下会被编译掉）、颜色解析
   Native.cs        Win32 P/Invoke（只声明真正用到的接口）
   app.manifest     DPI 感知 / 兼容性 / asInvoker
   app.rc           图标 + 清单 + 版本信息（由 build.ps1 用 rc.exe 编译）
   AssemblyInfo.cs  程序集元数据（含 TargetFramework，降低启发式误报）
-assets\            图标与预览图
+assets\            图标、界面预览图、主题画廊
 tools\
   make_icon.py              生成图标（可选，需要 Python + Pillow）
+  make_theme_gallery.py     把 --themes 的输出拼成主题画廊图（可选）
   check-false-positive.ps1  误报自检与处置助手
 build.ps1          一键构建（-Minimal 精简版 / -Pfx 签名）
 dist\

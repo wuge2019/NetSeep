@@ -38,6 +38,8 @@ namespace NetSeep
         // ---- 消息 ----
         public const int WM_HOTKEY = 0x0312;
         public const int WM_DPICHANGED = 0x02E0;
+        public const int WM_SETTINGCHANGE = 0x001A;
+        public const int WM_DWMCOLORIZATIONCOLORCHANGED = 0x0320;
 
         // ---- 热键（仅在开启“鼠标穿透”时才注册，用作逃生热键）----
         public const int MOD_ALT = 0x0001;

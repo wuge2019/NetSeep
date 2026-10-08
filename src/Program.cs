@@ -82,7 +82,7 @@ namespace NetSeep
 
     internal static class Program
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
         private const string MutexName = @"Local\NetSeep.SingleInstance.v1";
 
         [STAThread]
@@ -103,6 +103,8 @@ namespace NetSeep
                     return ListMode(args);
                 case "--preview":
                     return PreviewMode(args);
+                case "--themes":
+                    return ThemesMode(args);
                 case "--reset":
                     Cli.Open();
                     AppConfig.Delete();
@@ -227,21 +229,30 @@ namespace NetSeep
             Cli.WriteLine("  NetSeep.exe --silent       启动但不显示首次运行提示");
             Cli.WriteLine("  NetSeep.exe --dump [秒]    实测网速（默认 10 秒）");
             Cli.WriteLine("  NetSeep.exe --list         列出所有网卡");
-            Cli.WriteLine("  NetSeep.exe --preview 路径 [缩放]  生成界面预览图");
+            Cli.WriteLine("  NetSeep.exe --preview 路径 [缩放] [主题]   生成界面预览图");
+            Cli.WriteLine("  NetSeep.exe --themes 目录 [缩放]          每个内置主题各出一张预览图");
             Cli.WriteLine("  NetSeep.exe --reset        删除配置文件");
             Cli.WriteLine("  NetSeep.exe --help         显示本帮助");
+            Cli.WriteLine();
+            Cli.WriteLine("  主题：" + ThemesMenuText());
             Cli.Close(true);
             return 0;
         }
 
-        private static int PreviewMode(string[] args)
+        private static string ThemesMenuText()
         {
-            string path = args.Length > 1 ? args[1] : "netseep-preview.png";
-            float scale = 1f;
-            if (args.Length > 2)
-                float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out scale);
-            if (scale < 1f) scale = 1f;
+            StringBuilder sb = new StringBuilder();
+            foreach (WidgetTheme t in Themes.Presets)
+            {
+                if (sb.Length > 0) sb.Append(" / ");
+                sb.Append(t.Id);
+            }
+            return sb.ToString();
+        }
 
+        /// <summary>造一个用于预览的示例画面（含一条像样的历史曲线）。</summary>
+        private static WidgetVisual BuildPreviewVisual(string themeId)
+        {
             WidgetVisual v = new WidgetVisual();
             v.UpValue = "256.4";
             v.UpUnit = "KB/s";
@@ -252,7 +263,6 @@ namespace NetSeep
             v.ShowGraph = true;
             v.Opacity = 1f;
 
-            // 造一条像样的历史曲线
             double[] up = new double[60];
             double[] down = new double[60];
             for (int i = 0; i < 60; i++)
@@ -266,7 +276,25 @@ namespace NetSeep
             v.UpHistory = up;
             v.DownHistory = down;
 
+            v.ApplyTheme(Themes.Resolve(
+                string.IsNullOrEmpty(themeId) ? Themes.DefaultId : themeId,
+                Color.FromArgb(24, 24, 27), 190,
+                Color.FromArgb(90, 214, 140), Color.FromArgb(86, 170, 245)));
+            return v;
+        }
+
+        private static int PreviewMode(string[] args)
+        {
+            string path = args.Length > 1 ? args[1] : "netseep-preview.png";
+            float scale = 1f;
+            if (args.Length > 2)
+                float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out scale);
+            if (scale < 1f) scale = 1f;
+            string themeId = args.Length > 3 ? args[3] : "";
+
+            WidgetVisual v = BuildPreviewVisual(themeId);
             Size size;
+
             using (Bitmap probe = new Bitmap(1, 1))
             using (Graphics pg = Graphics.FromImage(probe))
             using (WidgetMetrics m = WidgetRenderer.Measure(v, scale, pg))
@@ -285,8 +313,9 @@ namespace NetSeep
                     if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
                     bmp.Save(path, ImageFormat.Png);
-                    SaveComposite(bmp, Color.FromArgb(255, 32, 34, 38), Path.Combine(dir, Path.GetFileNameWithoutExtension(path) + "-dark.png"));
-                    SaveComposite(bmp, Color.FromArgb(255, 240, 240, 242), Path.Combine(dir, Path.GetFileNameWithoutExtension(path) + "-light.png"));
+                    SaveComposite(bmp, Color.FromArgb(255, 32, 34, 38), Path.Combine(dir, Path.GetFileNameWithoutExtension(path) + "-dark.png"), false);
+                    SaveComposite(bmp, Color.FromArgb(255, 240, 240, 242), Path.Combine(dir, Path.GetFileNameWithoutExtension(path) + "-light.png"), false);
+                    SaveComposite(bmp, Color.Empty, Path.Combine(dir, Path.GetFileNameWithoutExtension(path) + "-checker.png"), true);
                 }
             }
 
@@ -297,18 +326,75 @@ namespace NetSeep
             return 0;
         }
 
-        private static void SaveComposite(Bitmap widget, Color background, string path)
+        /// <summary>把浮窗贴到背景上另存一张；checker=true 时用透明棋盘格背景。</summary>
+        private static void SaveComposite(Bitmap widget, Color background, string path, bool checker)
         {
             int pad = 24;
             using (Bitmap canvas = new Bitmap(widget.Width + pad * 2, widget.Height + pad * 2, PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(canvas))
                 {
-                    g.Clear(background);
+                    if (checker)
+                    {
+                        const int cell = 8;
+                        for (int y = 0; y < canvas.Height; y += cell)
+                        {
+                            for (int x = 0; x < canvas.Width; x += cell)
+                            {
+                                bool odd = ((x / cell) + (y / cell)) % 2 == 1;
+                                using (SolidBrush b = new SolidBrush(odd ? Color.FromArgb(255, 205, 205, 205) : Color.FromArgb(255, 240, 240, 240)))
+                                    g.FillRectangle(b, x, y, cell, cell);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        g.Clear(background);
+                    }
                     g.DrawImageUnscaled(widget, pad, pad);
                 }
                 canvas.Save(path, ImageFormat.Png);
             }
+        }
+
+        /// <summary>每个内置主题各出一张棋盘格背景的预览图，便于做主题画廊。</summary>
+        private static int ThemesMode(string[] args)
+        {
+            string dir = args.Length > 1 ? args[1] : "themes";
+            float scale = 2f;
+            if (args.Length > 2)
+                float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out scale);
+            if (scale < 1f) scale = 1f;
+
+            Directory.CreateDirectory(dir);
+            int count = 0;
+            foreach (WidgetTheme t in Themes.Presets)
+            {
+                if (t.IsCustom) continue;   // 自定义不在画廊里
+
+                WidgetVisual v = BuildPreviewVisual(t.Id);
+                using (Bitmap probe = new Bitmap(1, 1))
+                using (Graphics pg = Graphics.FromImage(probe))
+                using (WidgetMetrics m = WidgetRenderer.Measure(v, scale, pg))
+                {
+                    using (Bitmap bmp = new Bitmap(m.Size.Width, m.Size.Height, PixelFormat.Format32bppArgb))
+                    {
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            g.Clear(Color.Transparent);
+                            WidgetRenderer.Draw(g, v, m);
+                        }
+                        SaveComposite(bmp, Color.Empty, Path.Combine(dir, t.Id + ".png"), true);
+                        count++;
+                    }
+                }
+            }
+
+            Cli.Open();
+            Cli.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                "已生成 {0} 张主题预览图：{1}", count, Path.GetFullPath(dir)));
+            Cli.Close(false);
+            return 0;
         }
 
         private static void LogError(Exception ex)

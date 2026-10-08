@@ -23,6 +23,7 @@ namespace NetSeep
         public bool ShowGraph = false;
         public int IntervalMs = 1000;
         public int OpacityPercent = 88;
+        public string Theme = Themes.DefaultId;   // dark / light / midnight / graphite / contrast / glass / system / custom
         public int BgAlpha = 190;
         public bool TopMost = true;
         public bool Locked = false;
@@ -113,6 +114,7 @@ namespace NetSeep
                 case "showgraph": ShowGraph = ParseBool(v, ShowGraph); break;
                 case "intervalms": IntervalMs = ParseInt(v, IntervalMs); break;
                 case "opacity": OpacityPercent = ParseInt(v, OpacityPercent); break;
+                case "theme": Theme = v; break;
                 case "bgalpha": BgAlpha = ParseInt(v, BgAlpha); break;
                 case "topmost": TopMost = ParseBool(v, TopMost); break;
                 case "locked": Locked = ParseBool(v, Locked); break;
@@ -132,6 +134,7 @@ namespace NetSeep
             IntervalMs = Clamp(IntervalMs, 250, 10000);
             OpacityPercent = Clamp(OpacityPercent, 20, 100);
             BgAlpha = Clamp(BgAlpha, 0, 255);
+            if (string.IsNullOrEmpty(Theme)) Theme = Themes.DefaultId;
         }
 
         public void Save()
@@ -147,6 +150,7 @@ namespace NetSeep
                 sb.AppendLine("showgraph=" + (ShowGraph ? "1" : "0"));
                 sb.AppendLine("intervalms=" + IntervalMs.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("opacity=" + OpacityPercent.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine("theme=" + Theme);
                 sb.AppendLine("bgalpha=" + BgAlpha.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("topmost=" + (TopMost ? "1" : "0"));
                 sb.AppendLine("locked=" + (Locked ? "1" : "0"));
